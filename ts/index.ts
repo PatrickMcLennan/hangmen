@@ -24,15 +24,18 @@ const prompter = readline.createInterface({
 
 function checkAnswer(letters: string[], guesses: Guesses): { won: boolean, lost: boolean } {
   return {
-    won: guesses.correct.length === letters.length,
-    lost: guesses.incorrect.length === GUESS_COUNT
+    won: guesses.correct.length === letters.filter((letter, i, lettersArray) => lettersArray.indexOf(letter) === i).length,
+    lost: guesses.incorrect.length === GUESS_COUNT 
   }
 }
 
 function getWord(): Promise<string> {
-  return new Promise((res, rej) => 
+  return new Promise((res) => 
     fs.readFile(path.resolve(__dirname, `../words.txt`), `utf8`, (err, data) => {
-      if (err) return rej(err);
+      if (err) {
+        console.error(`There was an issue getting your word.`)
+        return process.exit(1);
+      }
       const wordsArray = data.split(`\n`);
       return res(wordsArray[Math.floor(wordsArray.length * Math.random())])
     })
@@ -45,16 +48,21 @@ function prompt(question: string): Promise<string> {
   )
 }
 
-async function nextRound(letters: string[], guesses: Guesses, guess: Promise<string>): Promise<void> {
-  const result = await guess();
+async function playRound(letters: string[], guesses: Guesses, guess: Promise<string>): Promise<void> {
+  const result = await guess;
   letters.includes(result) 
     ? guesses.correct.push(result) 
     : guesses.incorrect.push(result);
   const { won, lost } = checkAnswer(letters, guesses);
-  if (won) return console.log(`you've won!`);
-  if (lost) return console.log(`you've lost!`);
-
-  return nextRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(result))))
+  if (won || lost) {
+    const word = letters.join(``);
+    console.log(won 
+      ? `\nCongrats, you win!  The word was ${word}\n` 
+      : `\nYou've lost.  Your word was ${word}\n`
+    );
+    return process.exit(0);
+  }
+  return playRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(result))))
 }
 
 async function main() {
@@ -64,12 +72,12 @@ async function main() {
     correct: [],
     incorrect: []
   }
-  const firstGuess = await prompt(intro(letters));
-  return nextRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(firstGuess))))
+
+  return playRound(letters, guesses, prompt(intro(letters)))
 }
 
 /**
- * Copy
+ * Messages
  */
 
 function intro(letters: string[]): string { 

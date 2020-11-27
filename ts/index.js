@@ -22,14 +22,16 @@ const prompter = readline_1.default.createInterface({
 });
 function checkAnswer(letters, guesses) {
     return {
-        won: guesses.correct.length === letters.length,
+        won: guesses.correct.length === letters.filter((letter, i, lettersArray) => lettersArray.indexOf(letter) === i).length,
         lost: guesses.incorrect.length === GUESS_COUNT
     };
 }
 function getWord() {
-    return new Promise((res, rej) => fs_1.default.readFile(path_1.default.resolve(__dirname, `../words.txt`), `utf8`, (err, data) => {
-        if (err)
-            return rej(err);
+    return new Promise((res) => fs_1.default.readFile(path_1.default.resolve(__dirname, `../words.txt`), `utf8`, (err, data) => {
+        if (err) {
+            console.error(`There was an issue getting your word.`);
+            return process.exit(1);
+        }
         const wordsArray = data.split(`\n`);
         return res(wordsArray[Math.floor(wordsArray.length * Math.random())]);
     }));
@@ -37,18 +39,21 @@ function getWord() {
 function prompt(question) {
     return new Promise((res) => prompter.question(question, guess => res(guess.split(``)[0])));
 }
-function nextRound(letters, guesses, guess) {
+function playRound(letters, guesses, guess) {
     return __awaiter(this, void 0, void 0, function* () {
-        const result = yield guess();
+        const result = yield guess;
         letters.includes(result)
             ? guesses.correct.push(result)
             : guesses.incorrect.push(result);
         const { won, lost } = checkAnswer(letters, guesses);
-        if (won)
-            return console.log(`you've won!`);
-        if (lost)
-            return console.log(`you've lost!`);
-        return nextRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(result))));
+        if (won || lost) {
+            const word = letters.join(``);
+            console.log(won
+                ? `\nCongrats, you win!  The word was ${word}\n`
+                : `\nYou've lost.  Your word was ${word}\n`);
+            return process.exit(0);
+        }
+        return playRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(result))));
     });
 }
 function main() {
@@ -59,8 +64,7 @@ function main() {
             correct: [],
             incorrect: []
         };
-        const firstGuess = yield prompt(intro(letters));
-        return nextRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(firstGuess))));
+        return playRound(letters, guesses, prompt(intro(letters)));
     });
 }
 function intro(letters) {
@@ -80,4 +84,3 @@ function nextQuestion(letters, { correct, incorrect }, correctGuess) {
   `;
 }
 main();
-//# sourceMappingURL=index.js.map
