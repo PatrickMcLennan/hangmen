@@ -13,6 +13,11 @@ type Guesses = {
   incorrect: string[]
 }
 
+type Answers = {
+  won: boolean,
+  lost: boolean
+}
+
 const prompter = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -22,7 +27,7 @@ const prompter = readline.createInterface({
  * Prompts + functionality
  */
 
-function checkAnswer(letters: string[], guesses: Guesses): { won: boolean, lost: boolean } {
+function checkAnswer(letters: string[], guesses: Guesses): Answers {
   return {
     won: guesses.correct.length === letters.filter((letter, i, lettersArray) => lettersArray.indexOf(letter) === i).length,
     lost: guesses.incorrect.length === GUESS_COUNT 
@@ -30,12 +35,9 @@ function checkAnswer(letters: string[], guesses: Guesses): { won: boolean, lost:
 }
 
 function getWord(): Promise<string> {
-  return new Promise((res) => 
+  return new Promise((res, rej) => 
     fs.readFile(path.resolve(__dirname, `../words.txt`), `utf8`, (err, data) => {
-      if (err) {
-        console.error(`There was an issue getting your word.`)
-        return process.exit(1);
-      }
+      if (err) return rej(err);
       const wordsArray = data.split(`\n`);
       return res(wordsArray[Math.floor(wordsArray.length * Math.random())])
     })
@@ -65,17 +67,6 @@ async function playRound(letters: string[], guesses: Guesses, guess: Promise<str
   return playRound(letters, guesses, prompt(nextQuestion(letters, guesses, letters.includes(result))))
 }
 
-async function main() {
-  const word = await getWord();
-  const letters = word.split(``);
-  const guesses: Guesses = {
-    correct: [],
-    incorrect: []
-  }
-
-  return playRound(letters, guesses, prompt(intro(letters)))
-}
-
 /**
  * Messages
  */
@@ -102,4 +93,17 @@ function nextQuestion(letters: string[], { correct, incorrect }: Guesses, correc
  * Let 'er rip
  */
 
- main();
+ getWord()
+  .then(word => {
+    const letters = word.split(``);
+    const guesses: Guesses = {
+      correct: [],
+      incorrect: []
+    }
+  
+    return playRound(letters, guesses, prompt(intro(letters)))
+  })
+  .catch(err => {
+    console.error(`There was an issue getting your word: ${err}`)
+    return process.exit(1);
+  }) 
